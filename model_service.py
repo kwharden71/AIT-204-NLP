@@ -68,12 +68,12 @@ NEXT FILE:      activity4_app.py          (imports and uses this service)
 import json
 import torch
 
-from activity1_preprocessing import (
-    Vocabulary, clean_text, tokenize, preprocess_for_model
+from activity_part1_multilevel import (
+    Vocabulary, clean_text, tokenize, predict, SENTIMENT_LABELS
 )
-from activity2_model import load_model
+from activity_part1_multilevel import load_model
 
-MODEL_DIR = "saved_model"
+MODEL_DIR = "saved_model_multilevel"
 
 
 # =========================================================================
@@ -105,7 +105,7 @@ class SentimentService:
         #
         # HINT: Use Vocabulary.load(path) where path = f"{model_dir}/vocab.json"
         #       Store the result as self.vocab
-        self.vocab = Vocabulary.load("saved_model/vocab.json")
+        self.vocab = Vocabulary.load(f"{model_dir}/vocab.json")
 
         # ── TODO 2 ────────────────────────────────────────────────────────
         # Load the trained model saved by Activity 3.
@@ -113,7 +113,7 @@ class SentimentService:
         # HINT: Use load_model(path) where path = f"{model_dir}/model.pt"
         #       Then call self.model.eval() to disable Dropout for inference.
         #       Store the result as self.model
-        self.model = load_model("saved_model/model.pt")
+        self.model = load_model(f"{model_dir}/model.pt")
         self.model.eval()
 
         # Load max_length from config (already done for you)
@@ -185,29 +185,19 @@ class SentimentService:
         cleaned     = clean_text(text)
         tokens      = tokenize(cleaned)
         encoded     = self.vocab.encode(tokens)
-        tensor      = preprocess_for_model(text, self.vocab, self.max_length)
 
         with torch.no_grad():
-            probability = self.model(tensor).item()
-
-        if probability >= 0.5:  
-            sentiment = "Positive"  
-            confidence = probability
-        else:
-            sentiment = "Negative"
-            confidence = 1 - probability
-        
-        known_count = sum(1 for t in tokens if t in self.vocab.word2idx)
+            result = predict(text, self.model, self.vocab, self.max_length)
 
         return {
-            "sentiment":      sentiment,
-            "confidence":     confidence,
-            "positive_score": float(probability),
-            "negative_score": float(1 - probability),
+            "sentiment":      SENTIMENT_LABELS[result["predicted_class"]],
+            "confidence":     result["confidence"],
+            "positive_score": 0,
+            "negative_score": 0,
             "cleaned":        cleaned,
             "tokens":         tokens,
             "encoded":        encoded[:self.max_length],
-            "known_count":    known_count,
+            "known_count":    0,
         }
 
     # ──────────────────────────────────────────────────────────────────────
